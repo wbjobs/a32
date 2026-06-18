@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v5.28.3
-// source: slowquery.proto
+// source: slowquery/slowquery.proto
 
 package slowquery
 
@@ -34,13 +34,15 @@ type SlowLogEntry struct {
 	Database      string                 `protobuf:"bytes,9,opt,name=database,proto3" json:"database,omitempty"`
 	Uuid          string                 `protobuf:"bytes,10,opt,name=uuid,proto3" json:"uuid,omitempty"`
 	LogOffset     int64                  `protobuf:"varint,11,opt,name=log_offset,json=logOffset,proto3" json:"log_offset,omitempty"`
+	ClientIp      string                 `protobuf:"bytes,12,opt,name=client_ip,json=clientIp,proto3" json:"client_ip,omitempty"`
+	ThreadId      int64                  `protobuf:"varint,13,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SlowLogEntry) Reset() {
 	*x = SlowLogEntry{}
-	mi := &file_slowquery_proto_msgTypes[0]
+	mi := &file_slowquery_slowquery_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -52,7 +54,7 @@ func (x *SlowLogEntry) String() string {
 func (*SlowLogEntry) ProtoMessage() {}
 
 func (x *SlowLogEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_slowquery_proto_msgTypes[0]
+	mi := &file_slowquery_slowquery_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -65,7 +67,7 @@ func (x *SlowLogEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SlowLogEntry.ProtoReflect.Descriptor instead.
 func (*SlowLogEntry) Descriptor() ([]byte, []int) {
-	return file_slowquery_proto_rawDescGZIP(), []int{0}
+	return file_slowquery_slowquery_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *SlowLogEntry) GetAgentId() string {
@@ -145,6 +147,20 @@ func (x *SlowLogEntry) GetLogOffset() int64 {
 	return 0
 }
 
+func (x *SlowLogEntry) GetClientIp() string {
+	if x != nil {
+		return x.ClientIp
+	}
+	return ""
+}
+
+func (x *SlowLogEntry) GetThreadId() int64 {
+	if x != nil {
+		return x.ThreadId
+	}
+	return 0
+}
+
 type Ack struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
@@ -158,7 +174,7 @@ type Ack struct {
 
 func (x *Ack) Reset() {
 	*x = Ack{}
-	mi := &file_slowquery_proto_msgTypes[1]
+	mi := &file_slowquery_slowquery_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -170,7 +186,7 @@ func (x *Ack) String() string {
 func (*Ack) ProtoMessage() {}
 
 func (x *Ack) ProtoReflect() protoreflect.Message {
-	mi := &file_slowquery_proto_msgTypes[1]
+	mi := &file_slowquery_slowquery_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -183,7 +199,7 @@ func (x *Ack) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Ack.ProtoReflect.Descriptor instead.
 func (*Ack) Descriptor() ([]byte, []int) {
-	return file_slowquery_proto_rawDescGZIP(), []int{1}
+	return file_slowquery_slowquery_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Ack) GetOk() bool {
@@ -232,7 +248,7 @@ type HeatQueryRequest struct {
 
 func (x *HeatQueryRequest) Reset() {
 	*x = HeatQueryRequest{}
-	mi := &file_slowquery_proto_msgTypes[2]
+	mi := &file_slowquery_slowquery_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -244,7 +260,7 @@ func (x *HeatQueryRequest) String() string {
 func (*HeatQueryRequest) ProtoMessage() {}
 
 func (x *HeatQueryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_slowquery_proto_msgTypes[2]
+	mi := &file_slowquery_slowquery_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -257,7 +273,7 @@ func (x *HeatQueryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeatQueryRequest.ProtoReflect.Descriptor instead.
 func (*HeatQueryRequest) Descriptor() ([]byte, []int) {
-	return file_slowquery_proto_rawDescGZIP(), []int{2}
+	return file_slowquery_slowquery_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *HeatQueryRequest) GetStartTime() string {
@@ -295,7 +311,7 @@ type TableHeat struct {
 
 func (x *TableHeat) Reset() {
 	*x = TableHeat{}
-	mi := &file_slowquery_proto_msgTypes[3]
+	mi := &file_slowquery_slowquery_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -307,7 +323,7 @@ func (x *TableHeat) String() string {
 func (*TableHeat) ProtoMessage() {}
 
 func (x *TableHeat) ProtoReflect() protoreflect.Message {
-	mi := &file_slowquery_proto_msgTypes[3]
+	mi := &file_slowquery_slowquery_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -320,7 +336,7 @@ func (x *TableHeat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TableHeat.ProtoReflect.Descriptor instead.
 func (*TableHeat) Descriptor() ([]byte, []int) {
-	return file_slowquery_proto_rawDescGZIP(), []int{3}
+	return file_slowquery_slowquery_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *TableHeat) GetTableName() string {
@@ -377,7 +393,7 @@ type HeatQueryResponse struct {
 
 func (x *HeatQueryResponse) Reset() {
 	*x = HeatQueryResponse{}
-	mi := &file_slowquery_proto_msgTypes[4]
+	mi := &file_slowquery_slowquery_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -389,7 +405,7 @@ func (x *HeatQueryResponse) String() string {
 func (*HeatQueryResponse) ProtoMessage() {}
 
 func (x *HeatQueryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_slowquery_proto_msgTypes[4]
+	mi := &file_slowquery_slowquery_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -402,7 +418,7 @@ func (x *HeatQueryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeatQueryResponse.ProtoReflect.Descriptor instead.
 func (*HeatQueryResponse) Descriptor() ([]byte, []int) {
-	return file_slowquery_proto_rawDescGZIP(), []int{4}
+	return file_slowquery_slowquery_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *HeatQueryResponse) GetTables() []*TableHeat {
@@ -433,11 +449,11 @@ func (x *HeatQueryResponse) GetTotalSlowQueries() int32 {
 	return 0
 }
 
-var File_slowquery_proto protoreflect.FileDescriptor
+var File_slowquery_slowquery_proto protoreflect.FileDescriptor
 
-const file_slowquery_proto_rawDesc = "" +
+const file_slowquery_slowquery_proto_rawDesc = "" +
 	"\n" +
-	"\x0fslowquery.proto\x12\tslowquery\"\xc1\x02\n" +
+	"\x19slowquery/slowquery.proto\x12\tslowquery\"\xfb\x02\n" +
 	"\fSlowLogEntry\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x19\n" +
 	"\braw_line\x18\x02 \x01(\tR\arawLine\x12\x1c\n" +
@@ -452,7 +468,9 @@ const file_slowquery_proto_rawDesc = "" +
 	"\x04uuid\x18\n" +
 	" \x01(\tR\x04uuid\x12\x1d\n" +
 	"\n" +
-	"log_offset\x18\v \x01(\x03R\tlogOffset\"~\n" +
+	"log_offset\x18\v \x01(\x03R\tlogOffset\x12\x1b\n" +
+	"\tclient_ip\x18\f \x01(\tR\bclientIp\x12\x1b\n" +
+	"\tthread_id\x18\r \x01(\x03R\bthreadId\"~\n" +
 	"\x03Ack\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1a\n" +
@@ -484,26 +502,26 @@ const file_slowquery_proto_rawDesc = "" +
 	"\rStreamSlowLog\x12\x17.slowquery.SlowLogEntry\x1a\x0e.slowquery.Ack(\x010\x01B2Z0github.com/trae3/slowquery-lineage/pkg/slowqueryb\x06proto3"
 
 var (
-	file_slowquery_proto_rawDescOnce sync.Once
-	file_slowquery_proto_rawDescData []byte
+	file_slowquery_slowquery_proto_rawDescOnce sync.Once
+	file_slowquery_slowquery_proto_rawDescData []byte
 )
 
-func file_slowquery_proto_rawDescGZIP() []byte {
-	file_slowquery_proto_rawDescOnce.Do(func() {
-		file_slowquery_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_slowquery_proto_rawDesc), len(file_slowquery_proto_rawDesc)))
+func file_slowquery_slowquery_proto_rawDescGZIP() []byte {
+	file_slowquery_slowquery_proto_rawDescOnce.Do(func() {
+		file_slowquery_slowquery_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_slowquery_slowquery_proto_rawDesc), len(file_slowquery_slowquery_proto_rawDesc)))
 	})
-	return file_slowquery_proto_rawDescData
+	return file_slowquery_slowquery_proto_rawDescData
 }
 
-var file_slowquery_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
-var file_slowquery_proto_goTypes = []any{
+var file_slowquery_slowquery_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_slowquery_slowquery_proto_goTypes = []any{
 	(*SlowLogEntry)(nil),      // 0: slowquery.SlowLogEntry
 	(*Ack)(nil),               // 1: slowquery.Ack
 	(*HeatQueryRequest)(nil),  // 2: slowquery.HeatQueryRequest
 	(*TableHeat)(nil),         // 3: slowquery.TableHeat
 	(*HeatQueryResponse)(nil), // 4: slowquery.HeatQueryResponse
 }
-var file_slowquery_proto_depIdxs = []int32{
+var file_slowquery_slowquery_proto_depIdxs = []int32{
 	3, // 0: slowquery.HeatQueryResponse.tables:type_name -> slowquery.TableHeat
 	0, // 1: slowquery.SlowQueryService.StreamSlowLog:input_type -> slowquery.SlowLogEntry
 	1, // 2: slowquery.SlowQueryService.StreamSlowLog:output_type -> slowquery.Ack
@@ -514,26 +532,26 @@ var file_slowquery_proto_depIdxs = []int32{
 	0, // [0:1] is the sub-list for field type_name
 }
 
-func init() { file_slowquery_proto_init() }
-func file_slowquery_proto_init() {
-	if File_slowquery_proto != nil {
+func init() { file_slowquery_slowquery_proto_init() }
+func file_slowquery_slowquery_proto_init() {
+	if File_slowquery_slowquery_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_slowquery_proto_rawDesc), len(file_slowquery_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_slowquery_slowquery_proto_rawDesc), len(file_slowquery_slowquery_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_slowquery_proto_goTypes,
-		DependencyIndexes: file_slowquery_proto_depIdxs,
-		MessageInfos:      file_slowquery_proto_msgTypes,
+		GoTypes:           file_slowquery_slowquery_proto_goTypes,
+		DependencyIndexes: file_slowquery_slowquery_proto_depIdxs,
+		MessageInfos:      file_slowquery_slowquery_proto_msgTypes,
 	}.Build()
-	File_slowquery_proto = out.File
-	file_slowquery_proto_goTypes = nil
-	file_slowquery_proto_depIdxs = nil
+	File_slowquery_slowquery_proto = out.File
+	file_slowquery_slowquery_proto_goTypes = nil
+	file_slowquery_slowquery_proto_depIdxs = nil
 }

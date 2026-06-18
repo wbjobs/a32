@@ -20,6 +20,8 @@ message SlowLogEntry {
   string database = 9;
   string uuid = 10;
   int64 log_offset = 11;
+  string client_ip = 12;
+  int64 thread_id = 13;
 }
 
 message Ack {

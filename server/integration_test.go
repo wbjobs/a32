@@ -12,7 +12,7 @@ import (
 
 func TestEndToEndPipeline(t *testing.T) {
 	hm := NewHeatMap(1*time.Hour, 10000)
-	svc := NewGRPCService(hm, nil)
+	svc := NewGRPCService(hm, nil, nil, nil)
 
 	entries := []*pb.SlowLogEntry{
 		{AgentId: "agent-1", Timestamp: "2026-06-19T10:00:01Z", QueryTime: 5.23, LockTime: 3.10, Sql: "SELECT u.id, u.name FROM users u JOIN orders o ON u.id = o.user_id WHERE o.status = 'pending'", Database: "myapp"},
@@ -48,7 +48,7 @@ func TestEndToEndPipeline(t *testing.T) {
 		t.Errorf("expected orders as hottest table (2 slow queries), got %s", top[0].TableName)
 	}
 
-	handler := NewHTTPHandler(hm)
+	handler := NewHTTPHandler(hm, nil, nil, nil)
 	req := httptest.NewRequest("GET", "/api/v1/heat/top?start=2026-06-19T09:00:00Z&end=2026-06-19T11:00:00Z&n=10", nil)
 	w := httptest.NewRecorder()
 	handler.Handler().ServeHTTP(w, req)

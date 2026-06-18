@@ -137,7 +137,7 @@ func TestIdempotencyEmptyUUID(t *testing.T) {
 
 func TestIdempotencyGRPCIntegration(t *testing.T) {
 	hm := NewHeatMap(1*time.Hour, 10000)
-	svc := NewGRPCService(hm, nil)
+	svc := NewGRPCService(hm, nil, nil, nil)
 
 	entry := &pb.SlowLogEntry{
 		AgentId:    "agent-1",

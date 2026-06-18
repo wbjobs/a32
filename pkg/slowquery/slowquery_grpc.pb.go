@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.4.0
 // - protoc             v5.28.3
-// source: slowquery.proto
+// source: slowquery/slowquery.proto
 
 package slowquery
 
@@ -138,5 +138,5 @@ var SlowQueryService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "slowquery.proto",
+	Metadata: "slowquery/slowquery.proto",
 }

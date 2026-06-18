@@ -22,6 +22,8 @@ import (
 var (
 	reTimestamp  = regexp.MustCompile(`^#\s+Time:\s+(\S+)`)
 	reUserHost   = regexp.MustCompile(`^#\s+User@Host:`)
+	reUserHostIP = regexp.MustCompile(`\[([\d.:a-fA-F]+)\]\s*$`)
+	reUserHostID = regexp.MustCompile(`Id:\s*(\d+)`)
 	reQueryTime  = regexp.MustCompile(`^#\s+Query_time:\s+([\d.]+)\s+Lock_time:\s+([\d.]+)\s+Rows_sent:\s+(\d+)\s+Rows_examined:\s+(\d+)`)
 	reSlowLogHdr = regexp.MustCompile(`^/.*\s+MySQL,\s+Version:`)
 )
@@ -61,6 +63,14 @@ func (p *slowLogParser) flush() (*pb.SlowLogEntry, int64) {
 			continue
 		}
 		if reUserHost.MatchString(line) {
+			if m := reUserHostIP.FindStringSubmatch(line); m != nil {
+				entry.ClientIp = m[1]
+			}
+			if m := reUserHostID.FindStringSubmatch(line); m != nil {
+				if id, err := strconv.ParseInt(m[1], 10, 64); err == nil {
+					entry.ThreadId = id
+				}
+			}
 			enteredBlock = true
 			continue
 		}
