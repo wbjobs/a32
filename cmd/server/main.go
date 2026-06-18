@@ -20,10 +20,29 @@ func main() {
 	httpAddr := flag.String("http-addr", ":8080", "HTTP listen address")
 	window := flag.Duration("window", 1*time.Hour, "sliding window duration for heat map")
 	maxSize := flag.Int("max-events", 100000, "maximum events to keep in memory")
+	redisAddr := flag.String("redis-addr", "localhost:6379", "Redis address for idempotency")
+	redisPassword := flag.String("redis-password", "", "Redis password")
+	redisDB := flag.Int("redis-db", 0, "Redis DB index")
+	redisTTL := flag.Duration("redis-ttl", 24*time.Hour, "Redis idempotency key TTL")
+	noRedis := flag.Bool("no-redis", false, "Disable Redis idempotency (for testing)")
 	flag.Parse()
 
 	heatMap := server.NewHeatMap(*window, *maxSize)
-	grpcService := server.NewGRPCService(heatMap)
+
+	var idempot *server.IdempotencyStore
+	if !*noRedis {
+		idempot = server.NewIdempotencyStore(*redisAddr, *redisPassword, *redisDB, *redisTTL)
+		if err := idempot.Ping(nil); err != nil {
+			log.Printf("[warn] Redis not reachable at %s: %v, idempotency disabled", *redisAddr, err)
+			idempot = nil
+		} else {
+			log.Printf("[idempotency] Redis enabled at %s, TTL=%v", *redisAddr, *redisTTL)
+		}
+	} else {
+		log.Printf("[idempotency] Redis disabled")
+	}
+
+	grpcService := server.NewGRPCService(heatMap, idempot)
 	httpHandler := server.NewHTTPHandler(heatMap)
 
 	grpcServer := grpc.NewServer()
@@ -60,4 +79,7 @@ func main() {
 	log.Println("shutting down...")
 	grpcServer.GracefulStop()
 	httpServer.Close()
+	if idempot != nil {
+		idempot.Close()
+	}
 }

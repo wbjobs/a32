@@ -27,20 +27,24 @@ var (
 )
 
 type slowLogParser struct {
-	lines []string
+	lines      []string
+	currentPos int64
 }
 
 func newSlowLogParser() *slowLogParser {
 	return &slowLogParser{}
 }
 
-func (p *slowLogParser) feed(line string) {
+func (p *slowLogParser) feed(line string, pos int64) {
+	if len(p.lines) == 0 {
+		p.currentPos = pos
+	}
 	p.lines = append(p.lines, line)
 }
 
-func (p *slowLogParser) flush() *pb.SlowLogEntry {
+func (p *slowLogParser) flush() (*pb.SlowLogEntry, int64) {
 	if len(p.lines) == 0 {
-		return nil
+		return nil, 0
 	}
 	entry := &pb.SlowLogEntry{}
 	enteredBlock := false
@@ -107,12 +111,13 @@ func (p *slowLogParser) flush() *pb.SlowLogEntry {
 	if currentDB != "" {
 		entry.Database = currentDB
 	}
+	logPos := p.currentPos
 	p.lines = p.lines[:0]
 
 	if !enteredBlock || entry.Sql == "" {
-		return nil
+		return nil, 0
 	}
-	return entry
+	return entry, logPos
 }
 
 func parseMySQLTimestamp(s string) (string, error) {
@@ -132,7 +137,12 @@ func parseMySQLTimestamp(s string) (string, error) {
 	return "", fmt.Errorf("cannot parse timestamp: %s", s)
 }
 
-func tailFile(ctx context.Context, path string, lines chan<- string) error {
+type LineWithPos struct {
+	text string
+	pos  int64
+}
+
+func tailFile(ctx context.Context, path string, lines chan<- LineWithPos) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("open slow log: %w", err)
@@ -141,13 +151,16 @@ func tailFile(ctx context.Context, path string, lines chan<- string) error {
 
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 0, 1024*1024), 10*1024*1024)
+	pos := int64(0)
 	for scanner.Scan() {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
-		lines <- scanner.Text()
+		line := scanner.Text()
+		lines <- LineWithPos{text: line, pos: pos}
+		pos += int64(len(line)) + 1
 	}
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("scan slow log: %w", err)
@@ -159,73 +172,247 @@ func tailFile(ctx context.Context, path string, lines chan<- string) error {
 			return ctx.Err()
 		default:
 		}
-		pos, err := f.Seek(0, io.SeekCurrent)
+		currentPos, err := f.Seek(0, io.SeekCurrent)
 		if err != nil {
 			return fmt.Errorf("seek: %w", err)
 		}
 		scanner = bufio.NewScanner(f)
 		scanner.Buffer(make([]byte, 0, 1024*1024), 10*1024*1024)
 		for scanner.Scan() {
-			lines <- scanner.Text()
+			lines <- LineWithPos{text: scanner.Text(), pos: pos}
+			pos += int64(len(scanner.Text())) + 1
 		}
-		if _, err := f.Seek(pos, io.SeekStart); err != nil {
+		if _, err := f.Seek(currentPos, io.SeekStart); err != nil {
 			return fmt.Errorf("seek back: %w", err)
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
 }
 
-func runAgent(ctx context.Context, serverAddr, logPath, agentID string) error {
-	conn, err := grpc.NewClient(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+type Agent struct {
+	serverAddr string
+	agentID    string
+	logPath    string
+	cache      *LocalCache
+	conn       *grpc.ClientConn
+	stream     pb.SlowQueryService_StreamSlowLogClient
+	sendCh     chan *pb.SlowLogEntry
+	ackCh      chan *pb.Ack
+	sequence   int32
+}
+
+func NewAgent(serverAddr, agentID, logPath string, cache *LocalCache) *Agent {
+	return &Agent{
+		serverAddr: serverAddr,
+		agentID:    agentID,
+		logPath:    logPath,
+		cache:      cache,
+		sendCh:     make(chan *pb.SlowLogEntry, 1024),
+		ackCh:      make(chan *pb.Ack, 1024),
+	}
+}
+
+func (a *Agent) connect(ctx context.Context) error {
+	var err error
+	a.conn, err = grpc.NewClient(a.serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("dial: %w", err)
 	}
-	defer conn.Close()
 
-	client := pb.NewSlowQueryServiceClient(conn)
-	stream, err := client.StreamSlowLog(ctx)
+	client := pb.NewSlowQueryServiceClient(a.conn)
+	a.stream, err = client.StreamSlowLog(ctx)
 	if err != nil {
+		a.conn.Close()
 		return fmt.Errorf("open stream: %w", err)
 	}
-	defer stream.CloseSend()
 
-	go func() {
-		for {
-			ack, err := stream.Recv()
-			if err != nil {
-				return
-			}
-			log.Printf("[ack] ok=%v seq=%d msg=%s", ack.Ok, ack.Sequence, ack.Message)
+	log.Printf("[agent] connected to %s", a.serverAddr)
+	return nil
+}
+
+func (a *Agent) disconnect() {
+	if a.stream != nil {
+		a.stream.CloseSend()
+	}
+	if a.conn != nil {
+		a.conn.Close()
+	}
+}
+
+func (a *Agent) reconnectWithBackoff(ctx context.Context) error {
+	backoff := 500 * time.Millisecond
+	maxBackoff := 30 * time.Second
+	attempts := 0
+
+	for {
+		attempts++
+		err := a.connect(ctx)
+		if err == nil {
+			log.Printf("[agent] reconnected after %d attempts", attempts)
+			a.resendPending(ctx)
+			return nil
 		}
-	}()
 
-	lines := make(chan string, 4096)
+		log.Printf("[agent] reconnect attempt %d failed: %v, backoff %v", attempts, err, backoff)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(backoff):
+		}
+
+		backoff *= 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
+	}
+}
+
+func (a *Agent) resendPending(ctx context.Context) {
+	pending := a.cache.GetAll()
+	if len(pending) == 0 {
+		return
+	}
+	log.Printf("[agent] resending %d pending entries", len(pending))
+	for _, entry := range pending {
+		select {
+		case <-ctx.Done():
+			return
+		case a.sendCh <- entry:
+		}
+	}
+}
+
+func (a *Agent) runSender(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case entry := <-a.sendCh:
+			if a.stream == nil {
+				if err := a.reconnectWithBackoff(ctx); err != nil {
+					return err
+				}
+			}
+
+			if entry.GetUuid() == "" {
+				entry.Uuid = GenerateEntryUUID(entry)
+			}
+
+			if err := a.cache.Add(entry); err != nil {
+				log.Printf("[agent] cache add failed: %v", err)
+			}
+
+			entry.AgentId = a.agentID
+
+			if err := a.stream.Send(entry); err != nil {
+				log.Printf("[agent] send failed: %v, reconnecting...", err)
+				a.disconnect()
+				a.stream = nil
+				if err := a.reconnectWithBackoff(ctx); err != nil {
+					return err
+				}
+				continue
+			}
+
+			a.sequence++
+		}
+	}
+}
+
+func (a *Agent) runReceiver(ctx context.Context) error {
+	for {
+		if a.stream == nil {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(100 * time.Millisecond):
+				continue
+			}
+		}
+
+		ack, err := a.stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			log.Printf("[agent] recv failed: %v, reconnecting...", err)
+			a.disconnect()
+			a.stream = nil
+			if err := a.reconnectWithBackoff(ctx); err != nil {
+				return err
+			}
+			continue
+		}
+
+		a.ackCh <- ack
+	}
+}
+
+func (a *Agent) runAckHandler(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case ack := <-a.ackCh:
+			if ack.GetUuid() != "" {
+				if err := a.cache.Remove(ack.GetUuid()); err != nil {
+					log.Printf("[agent] cache remove failed: %v", err)
+				}
+			}
+			log.Printf("[ack] ok=%v seq=%d uuid=%s cache_size=%d msg=%s",
+				ack.Ok, ack.Sequence, ack.Uuid, a.cache.Len(), ack.Message)
+		}
+	}
+}
+
+func (a *Agent) runLogTailer(ctx context.Context) error {
+	lines := make(chan LineWithPos, 4096)
 	go func() {
-		if err := tailFile(ctx, logPath, lines); err != nil {
+		if err := tailFile(ctx, a.logPath, lines); err != nil {
 			log.Fatalf("tail failed: %v", err)
 		}
 	}()
 
 	parser := newSlowLogParser()
-	seq := int32(0)
-
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case line := <-lines:
-			if strings.HasPrefix(line, "# Time:") && len(parser.lines) > 0 {
-				if entry := parser.flush(); entry != nil {
-					entry.AgentId = agentID
+		case lp := <-lines:
+			if strings.HasPrefix(lp.text, "# Time:") && len(parser.lines) > 0 {
+				if entry, pos := parser.flush(); entry != nil {
+					entry.LogOffset = pos
 					entry.RawLine = strings.Join(parser.lines, "\n")
-					if err := stream.Send(entry); err != nil {
-						return fmt.Errorf("send: %w", err)
+					entry.Uuid = GenerateEntryUUID(entry)
+					select {
+					case a.sendCh <- entry:
+					case <-ctx.Done():
+						return ctx.Err()
 					}
-					seq++
 				}
 			}
-			parser.feed(line)
+			parser.feed(lp.text, lp.pos)
 		}
+	}
+}
+
+func (a *Agent) Run(ctx context.Context) error {
+	go a.runAckHandler(ctx)
+
+	errCh := make(chan error, 3)
+	go func() { errCh <- a.runSender(ctx) }()
+	go func() { errCh <- a.runReceiver(ctx) }()
+	go func() { errCh <- a.runLogTailer(ctx) }()
+
+	select {
+	case <-ctx.Done():
+		a.disconnect()
+		a.cache.Close()
+		return ctx.Err()
+	case err := <-errCh:
+		a.disconnect()
+		a.cache.Close()
+		return err
 	}
 }
 
@@ -233,10 +420,12 @@ func main() {
 	server := flag.String("server", "localhost:50051", "gRPC server address")
 	logPath := flag.String("log", "", "Path to MySQL slow query log file")
 	agentID := flag.String("id", "", "Agent identifier (defaults to hostname)")
+	cacheDir := flag.String("cache-dir", "", "Local cache directory (defaults to ./.cache/<agent_id>)")
+	maxCache := flag.Int("max-cache", 10000, "Maximum pending entries in local cache")
 	flag.Parse()
 
 	if *logPath == "" {
-		fmt.Fprintln(os.Stderr, "Usage: agent -log <slow_query_log_path> [-server <addr>] [-id <agent_id>]")
+		fmt.Fprintln(os.Stderr, "Usage: agent -log <slow_query_log_path> [-server <addr>] [-id <agent_id>] [-cache-dir <dir>] [-max-cache <n>]")
 		os.Exit(1)
 	}
 
@@ -251,11 +440,24 @@ func main() {
 		id = hostname
 	}
 
+	cacheDirPath := *cacheDir
+	if cacheDirPath == "" {
+		cacheDirPath = filepath.Join(".cache", id)
+	}
+
+	cache, err := NewLocalCache(cacheDirPath, *maxCache)
+	if err != nil {
+		log.Fatalf("init cache: %v", err)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	log.Printf("agent %s starting, tailing %s -> %s", id, absPath, *server)
-	if err := runAgent(ctx, *server, absPath, id); err != nil {
+	log.Printf("agent %s starting, tailing %s -> %s, cache_dir=%s, cached_pending=%d",
+		id, absPath, *server, cacheDirPath, cache.Len())
+
+	agent := NewAgent(*server, id, absPath, cache)
+	if err := agent.Run(ctx); err != nil {
 		log.Fatalf("agent error: %v", err)
 	}
 }

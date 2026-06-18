@@ -18,12 +18,16 @@ message SlowLogEntry {
   int64 rows_examined = 7;
   string sql = 8;
   string database = 9;
+  string uuid = 10;
+  int64 log_offset = 11;
 }
 
 message Ack {
   bool ok = 1;
   string message = 2;
   int32 sequence = 3;
+  string uuid = 4;
+  int64 log_offset = 5;
 }
 
 message HeatQueryRequest {

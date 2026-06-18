@@ -3,7 +3,6 @@ package server
 import (
 	"io"
 	"log"
-	"strconv"
 	"time"
 
 	pb "github.com/trae3/slowquery-lineage/pkg/slowquery"
@@ -12,27 +11,53 @@ import (
 type GRPCService struct {
 	pb.UnimplementedSlowQueryServiceServer
 	heatMap *HeatMap
+	idempot *IdempotencyStore
 }
 
-func NewGRPCService(heatMap *HeatMap) *GRPCService {
+func NewGRPCService(heatMap *HeatMap, idempot *IdempotencyStore) *GRPCService {
 	return &GRPCService{
 		heatMap: heatMap,
+		idempot: idempot,
 	}
 }
 
 func (s *GRPCService) StreamSlowLog(stream pb.SlowQueryService_StreamSlowLogServer) error {
 	seq := int32(0)
+	ctx := stream.Context()
 	for {
 		entry, err := stream.Recv()
 		if err == io.EOF {
-			return stream.Send(&pb.Ack{
-				Ok:       true,
-				Message:  "stream closed",
-				Sequence: seq,
-			})
+			return nil
 		}
 		if err != nil {
 			return err
+		}
+
+		uuid := entry.GetUuid()
+		ack := &pb.Ack{
+			Ok:       true,
+			Message:  "processed",
+			Sequence: seq,
+			Uuid:     uuid,
+			LogOffset: entry.GetLogOffset(),
+		}
+
+		if s.idempot != nil && uuid != "" {
+			isNew, err := s.idempot.CheckAndSet(ctx, uuid)
+			if err != nil {
+				log.Printf("[idempot] error checking uuid %s: %v", uuid, err)
+				ack.Ok = false
+				ack.Message = "idempotency check failed"
+			} else if !isNew {
+				log.Printf("[idempot] duplicate entry skipped, uuid=%s", uuid)
+				ack.Ok = true
+				ack.Message = "duplicate skipped"
+				if err := stream.Send(ack); err != nil {
+					return err
+				}
+				seq++
+				continue
+			}
 		}
 
 		events := s.processEntry(entry)
@@ -41,11 +66,7 @@ func (s *GRPCService) StreamSlowLog(stream pb.SlowQueryService_StreamSlowLogServ
 		}
 
 		seq++
-		if err := stream.Send(&pb.Ack{
-			Ok:       true,
-			Message:  "processed",
-			Sequence: seq,
-		}); err != nil {
+		if err := stream.Send(ack); err != nil {
 			return err
 		}
 	}
@@ -84,31 +105,16 @@ func (s *GRPCService) processEntry(entry *pb.SlowLogEntry) []HeatEvent {
 		}
 		events = append(events, evt)
 		log.Printf(
-			"[lineage] agent=%s table=%s type=%s fields=%v qt=%.3f lt=%.3f",
+			"[lineage] agent=%s table=%s type=%s fields=%v qt=%.3f lt=%.3f uuid=%s",
 			entry.GetAgentId(),
 			table,
 			lineage.SQLType,
 			lineage.Fields,
 			entry.GetQueryTime(),
 			entry.GetLockTime(),
+			entry.GetUuid(),
 		)
 	}
 
 	return events
-}
-
-func parseIntField(s string) int64 {
-	if s == "" {
-		return 0
-	}
-	n, _ := strconv.ParseInt(s, 10, 64)
-	return n
-}
-
-func parseFloatField(s string) float64 {
-	if s == "" {
-		return 0
-	}
-	n, _ := strconv.ParseFloat(s, 64)
-	return n
 }

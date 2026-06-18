@@ -12,7 +12,7 @@ import (
 
 func TestEndToEndPipeline(t *testing.T) {
 	hm := NewHeatMap(1*time.Hour, 10000)
-	svc := NewGRPCService(hm)
+	svc := NewGRPCService(hm, nil)
 
 	entries := []*pb.SlowLogEntry{
 		{AgentId: "agent-1", Timestamp: "2026-06-19T10:00:01Z", QueryTime: 5.23, LockTime: 3.10, Sql: "SELECT u.id, u.name FROM users u JOIN orders o ON u.id = o.user_id WHERE o.status = 'pending'", Database: "myapp"},

@@ -32,6 +32,8 @@ type SlowLogEntry struct {
 	RowsExamined  int64                  `protobuf:"varint,7,opt,name=rows_examined,json=rowsExamined,proto3" json:"rows_examined,omitempty"`
 	Sql           string                 `protobuf:"bytes,8,opt,name=sql,proto3" json:"sql,omitempty"`
 	Database      string                 `protobuf:"bytes,9,opt,name=database,proto3" json:"database,omitempty"`
+	Uuid          string                 `protobuf:"bytes,10,opt,name=uuid,proto3" json:"uuid,omitempty"`
+	LogOffset     int64                  `protobuf:"varint,11,opt,name=log_offset,json=logOffset,proto3" json:"log_offset,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -129,11 +131,27 @@ func (x *SlowLogEntry) GetDatabase() string {
 	return ""
 }
 
+func (x *SlowLogEntry) GetUuid() string {
+	if x != nil {
+		return x.Uuid
+	}
+	return ""
+}
+
+func (x *SlowLogEntry) GetLogOffset() int64 {
+	if x != nil {
+		return x.LogOffset
+	}
+	return 0
+}
+
 type Ack struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
 	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	Sequence      int32                  `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	Uuid          string                 `protobuf:"bytes,4,opt,name=uuid,proto3" json:"uuid,omitempty"`
+	LogOffset     int64                  `protobuf:"varint,5,opt,name=log_offset,json=logOffset,proto3" json:"log_offset,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -185,6 +203,20 @@ func (x *Ack) GetMessage() string {
 func (x *Ack) GetSequence() int32 {
 	if x != nil {
 		return x.Sequence
+	}
+	return 0
+}
+
+func (x *Ack) GetUuid() string {
+	if x != nil {
+		return x.Uuid
+	}
+	return ""
+}
+
+func (x *Ack) GetLogOffset() int64 {
+	if x != nil {
+		return x.LogOffset
 	}
 	return 0
 }
@@ -405,7 +437,7 @@ var File_slowquery_proto protoreflect.FileDescriptor
 
 const file_slowquery_proto_rawDesc = "" +
 	"\n" +
-	"\x0fslowquery.proto\x12\tslowquery\"\x8e\x02\n" +
+	"\x0fslowquery.proto\x12\tslowquery\"\xc1\x02\n" +
 	"\fSlowLogEntry\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x19\n" +
 	"\braw_line\x18\x02 \x01(\tR\arawLine\x12\x1c\n" +
@@ -416,11 +448,18 @@ const file_slowquery_proto_rawDesc = "" +
 	"\trows_sent\x18\x06 \x01(\x03R\browsSent\x12#\n" +
 	"\rrows_examined\x18\a \x01(\x03R\frowsExamined\x12\x10\n" +
 	"\x03sql\x18\b \x01(\tR\x03sql\x12\x1a\n" +
-	"\bdatabase\x18\t \x01(\tR\bdatabase\"K\n" +
+	"\bdatabase\x18\t \x01(\tR\bdatabase\x12\x12\n" +
+	"\x04uuid\x18\n" +
+	" \x01(\tR\x04uuid\x12\x1d\n" +
+	"\n" +
+	"log_offset\x18\v \x01(\x03R\tlogOffset\"~\n" +
 	"\x03Ack\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1a\n" +
-	"\bsequence\x18\x03 \x01(\x05R\bsequence\"a\n" +
+	"\bsequence\x18\x03 \x01(\x05R\bsequence\x12\x12\n" +
+	"\x04uuid\x18\x04 \x01(\tR\x04uuid\x12\x1d\n" +
+	"\n" +
+	"log_offset\x18\x05 \x01(\x03R\tlogOffset\"a\n" +
 	"\x10HeatQueryRequest\x12\x1d\n" +
 	"\n" +
 	"start_time\x18\x01 \x01(\tR\tstartTime\x12\x19\n" +
